@@ -10,8 +10,9 @@ output:
 chooseCRANmirror(graphics=FALSE, ind=1)
 knitr::opts_chunk$set(echo = TRUE)
 ```
-## Task1 B
 public repo:https://github.com/Aliceleung1996/ChallengeB_LiangYan_HuTianxing
+
+## Task1 B
 
 Step1:
 A  non-parametric statistical method makes no assumption on the population distribution or sample size. 
