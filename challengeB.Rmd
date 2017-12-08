@@ -1,0 +1,324 @@
+---
+title: "Challenge B - Liang Yan & Hu Tianxing"
+author: "Liang Yan & Hu Tianxing"
+date: "2017/12/7"
+output:
+  html_document: default
+  word_document: default
+---
+public repo:https://github.com/Aliceleung1996/ChallengeB_LiangYan_HuTianxing
+```{r setup, include=FALSE}
+chooseCRANmirror(graphics=FALSE, ind=1)
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Task1 B
+Step1:
+A  non-parametric statistical method makes no assumption on the population distribution or sample size. 
+In the random forest approach, a large number of decision trees are created. Every observation is fed into every decision tree. The most common outcome for each observation is used as the final output. A new observation is fed into all the trees and taking a majority vote for each classification model.
+
+Step2:
+We loaded all the packages needed in the the beginning.
+```{r packages, echo = FALSE, include=FALSE}
+install.packages("ggplot2")
+library(ggplot2)
+install.packages("Formula")
+library(Formula)
+install.packages("hydroGOF")
+library(hydroGOF)
+install.packages("np")
+library(np)
+install.packages("tidyverse")
+library(tidyverse)
+install.packages("MASS")
+library(MASS)
+install.packages("tidyr")
+library(tidyr)
+install.packages("dplyr")
+library(dplyr)
+install.packages("caret")
+library(caret)
+install.packages("readxl")
+library(readxl)
+install.packages("dplyr")
+library(dplyr)
+install.packages("randomForest")
+library(randomForest)
+```
+Then we input the training data and the test data.
+```{r input data, echo = FALSE, include=FALSE}
+train <- read.csv("train.csv")
+test <- read.csv("test.csv")
+```
+
+From Challenge A, we found that while NA in some variables indeed means "missing value", while some NA in other variables has practical meanings. we removed the variable Id and variables with NAs meaning missing values.
+We also removed all the NAs from numeric variables and two character varialbes “Electrical” and “MasVnrType”, where NA has no practical meanings.
+```{r removes NA, echo = FALSE, include=FALSE}
+#
+train <- train[-c(1,7,31,32,33,34,36,58,59,61,64,65,73,74,75)]
+train
+test <- as.data.frame(test[-c(1,7,31,32,33,34,36,58,59,61,64,65,73,74,75)])
+test
+train <- train[complete.cases(train),]
+train
+sum(is.na(train))
+train
+test <- test[complete.cases(test),]
+test
+```
+
+train1 is not the training data. It is just used to create the formula in a convenient way by removing the dependent variable "SalePrice".
+```{r create formula, echo = FALSE, include=FALSE}
+train1 <- as.data.frame(train[-c(66)])
+names(train1)
+fmla <- as.formula(paste("SalePrice ~", paste(names(train1), collapse = "+")))
+fmla
+```
+
+We used the random forest as the nonparametric method.
+```{r, randomForest, include=FALSE}
+model <- randomForest(fmla, data = train)
+summary(model)
+print(model)
+```
+
+
+Step 3:
+We used the model trained to make predictions on the test data. 
+lm_tra is the linear model we estimated in challenge A after comparing the exclusion of missing values and the comparison of the importance of variables.
+In order to use the random forest model to predict testing data, we have to ensure that the all the variables in the testing data have same levels as those in the training data and we created a loop to do this.
+We made the predictions.
+By summarising parameters and comparing the residual standard error, which means the variations of the difference between predictions and observations, we concluded that the random forest would give better predictions.
+```{r comparison between models, echo = FALSE, include=FALSE}
+summary(model)
+model <- randomForest(fmla, data = train)
+summary(model)
+print(model)
+# We give the levels of the variables in training data to the corresponding variables in testing data.
+common <- intersect(names(train), names(test)) 
+for (p in common) { 
+  if (class(train[[p]]) == "factor") { 
+    levels(test[[p]]) <- levels(train[[p]]) 
+  } 
+}
+predict(model, test)
+lm_tra <- lm(SalePrice ~ LotFrontage +OverallQual 
+             +RoofMatl+ MasVnrArea+   BsmtFinSF1   
+             + BsmtFinSF2 + BsmtUnfSF+ X1stFlrSF +X2ndFlrSF +KitchenQual,data=train)
+summary(lm_tra)
+
+# We compared the residual standard errors of the two models.
+rfRSE <- sqrt(839951284)
+lmRSE <- 34020
+min(rfRSE,lmRSE)
+```
+
+## Task2 B
+
+First we created 150 independent simulations of x, e and y respectively based on the true model y=x^3 + e. The simulations are created by random draws from the normal distribution. Then we spilted them into training data and testing data.
+```{r create training data and testing data, echo = FALSE, include=FALSE}
+set.seed(1)
+# set seed to 1 to let you see the same random stimulations as we did
+
+# the true model is y=x^3 + epsilon
+sim_f <- function(x)
+{
+  x*x*x
+}  
+
+# simulate 150 outcomes respectively for x and e from the normal distribution and then generate y based on the x and e stimulated and the true function 
+n <- 1
+sim_x <- vector(length = 150)
+sim_y <- vector(length = 150)
+sim_e <- vector(length = 150)
+for (n in 1:150 ) {
+  sim_x[n]<-rnorm(1)
+  sim_e[n]<-rnorm(1)
+  sim_y[n]<-sim_f(sim_x[n])+sim_e[n]
+  n<-n+1
+}
+
+sim <- cbind(sim_x,sim_y,sim_e)
+sim <- data.frame(sim)
+sim
+
+# separate the simulations into two sets: a training set and a testing set
+sim_train <- slice(sim,1:120)
+Signal <- rep(1,times=120)
+sim_train<- mutate(sim_train,Signal)
+sim_test <- slice(sim,121:150)
+Signal <- rep(0,times=30)
+sim_test <- mutate(sim_test,Signal)
+sim <- union(sim_test,sim_train)
+sim_train
+sim_test
+sim
+
+```
+
+Step 1:
+We trained a low flexibility model of bandwidth = 0.5 based on the training data.
+```{r estimate low-flexibility model, echo = FALSE, include=FALSE}
+ll.fit.lowflex <- npreg(sim_y ~ sim_x, bws = 0.5, data = sim_train, method = "ll" )
+summary(ll.fit.lowflex)
+```
+
+Step 2:
+We trained a high flexibility model of bandwidth = 0.01 based on the training data.
+```{r estimate high-flexibility model, echo = FALSE, include=FALSE}
+ll.fit.highflex <- npreg(sim_y~sim_x, bws = 0.01, data = sim_train, method = "ll")
+summary(ll.fit.highflex)
+```
+
+Step 3:
+We made predictions on the training data using the low and high flexibility model respectively, then we gathered the predictions and the simulations, and plotted them on the same graph.
+```{r predictions on training data, echo = FALSE, include=FALSE}
+# predict y with the low (high) flexibility model trained based on the x in training data.
+predictionsl <- predict(ll.fit.lowflex)
+yhatl1 <- data.frame(predictionsl)
+predictionsh <- predict(ll.fit.highflex)
+yhath1 <- data.frame(predictionsh)
+
+# gather the simulations and the predicted values in the same data frame and plot them on the same graph
+new <- mutate(sim_train, yhath = yhath1$predictionsh, yhatl = yhatl1$predictionsl)
+new
+ggplot(data = new)+
+  geom_point(mapping = aes(x=sim_x, y=sim_y))+
+  geom_line(mapping = aes(x=sim_x, y=predictionsh), color = "blue")+
+  geom_line(mapping = aes(x=sim_x, y=predictionsl), color = "red")+
+  geom_line(mapping = aes(x=sim_x, y=sim_x^3),color = "black")
+```
+
+Step 4:
+The predictions of **ll.fit.highflex** are more variable. The predictions of **ll.fit.lowflex** have the least bias.
+
+Step 5:
+We performed similar procedures, predicting with the two models, gathering the data and ploting them on the same graphs.
+The predictions of **ll.fit.highflex** are more variable. The predictions of **ll.fit.lowflex** have the least bias.
+```{r predictions on testing data, echo = FALSE, include=FALSE}
+predictionsltest <- predict(ll.fit.lowflex, newdata = sim_test)
+yhatl1test <- data.frame(predictionsltest)
+predictionshtest <- predict(ll.fit.highflex, newdata = sim_test)
+yhath1test <- data.frame(predictionshtest)
+newtest <- mutate(sim_test, yhathtest = yhath1test$predictionshtest, yhatltest = yhatl1test$predictionsltest)
+newtest
+ggplot(data = newtest,aes(x=sim_x)) +
+  geom_point(mapping = aes(y=sim_y))+
+  geom_line(mapping = aes(y=yhatltest), color = "red")+
+  geom_line(mapping = aes(y=sim_x^3), color = "black")+
+  geom_line(mapping = aes(y=yhathtest), color = "blue")
+```
+
+Step 6:
+We created a vector of bandwidth going from 0.01 to 0.5 with a step of 0.001 using the seq function.
+```{r bandwidth vector, echo = FALSE, include=FALSE}
+bw <- seq(from = 0.01, to = 0.5, by = 0.001)
+bw
+```
+
+Step 7:
+We estimated a local linear model y ~ x on the training data with each bandwidth. We created an empty list first. Then we used the for loop to create models with different bandwidth values and store them in the list we created.
+```{r estimate models, echo = FALSE, include=FALSE}
+a <- list()
+for(i in seq(0.01,0.5,0.001)){
+  a <- list(a, npreg(sim_y~sim_x, bws = i, data = sim_train ,regtype = "ll" ))
+}
+a
+```
+
+Step 8 & Step 9:
+We computed for each bandwidth the MSE on the training data and the test data by using for loop and for both generating the predictions and creating the MSE.
+```{r compute MSE, echo = FALSE, include=FALSE}
+x <- 0.01
+p <- 1
+MSEtrain <- c(1:491)
+MSEtest <- c(1:491)
+for(x in bw){
+  model <- npreg(bws = x,data = sim_train,xdat= sim_train$sim_x,ydat = sim_train$sim_y,method = 'll')
+  fit <- fitted(model)
+  predtest <- predict(model, newdata = sim_test)
+  
+n <- 1
+s <- 0
+u <- 0
+m <- 1
+for (n in 1:120) {
+  s <- (fit[n]-sim_train$sim_y[n])^2+s
+  n <- n+1
+}
+for (m in 1:30) {
+  u <- (predtest[m]-sim_test$sim_y[m])^2+u
+  m <- m+1
+}
+MSEtrain[p] <- s/120
+MSEtest[p] <- u/30
+x <- x+0.001
+p <- p+1
+
+}
+
+M <- cbind(bw,MSEtrain,MSEtest)
+M <- as.data.frame(M)
+as.data.frame(M)
+
+```
+
+Step 10:
+We plotted the MSE with the increase of bandwidths from 0.01 to 0.5 of the training data and the testing data respectively.
+```{r plot MSE, echo = FALSE, include=FALSE}
+ggplot(data = M)+
+  geom_line(mapping = aes(x=bw,y=MSEtrain,color='blue'))+
+  geom_line(mapping = aes(x=bw,y=MSEtest,color='yellow'))
+```
+
+## Task3 B
+Step 1:
+We imported the CNIL dataset from the Open Data Portal and separate the variables with the sep argument.
+```{r import data, echo = FALSE, include=FALSE}
+#import the data
+CNIL <- read.csv('OpenCNIL_Organismes_avec_CIL_VD_20171204.csv',sep = ';')
+```
+
+Step 2:
+We first converted the variable Code_Postal to character in order to use the substr function.We used the substr function to represent each observation with the first two digits of their postcode. 
+Then we found the number of "types" of the first two digits, which is equal to the number of organizations with a CIL per department, since all the firms in the list have CIL. Lastly we put the results in a table.
+```{r find CIL per department, echo = FALSE, include=FALSE}
+unique(CNIL$Portee)
+# We first convert the variable Code_Postal to character in order to use the substr function
+as.data.frame(CNIL)
+CNIL$Code_Postal <- as.character(CNIL$Code_Postal)
+depart <- substr(CNIL$Code_Postal,1,2)
+# We use the substr function to represent each observation with the first two digits of their postcode. 
+# Then we find the number of "types" of the first two digits, which equal to the number of organizations with a CIL per department, since all the firms in the list have CIL.
+depart
+unique(depart)
+CILperdepart <- table(depart)
+```
+
+## Graphs
+
+
+Graph of Task2B Step 3: The scatterplot of x-y, along with the predictions of ll.fit.lowflex and ll.fit.highflex, on the training data
+```{r Task2B Step 3, echo=FALSE, eval=TRUE}
+ggplot(data = new)+
+  geom_point(mapping = aes(x=sim_x, y=sim_y))+
+  geom_line(mapping = aes(x=sim_x, y=predictionsh), color = "blue")+
+  geom_line(mapping = aes(x=sim_x, y=predictionsl), color = "red")+
+  geom_line(mapping = aes(x=sim_x, y=sim_x^3),color = "black")
+```
+
+Graph of Task2B Step 5: The scatterplot of x-y, along with the predictions of ll.fit.lowflex and ll.fit.highflex, on the testing data
+```{r Task2B Step 5, echo=FALSE, eval=TRUE}
+ggplot(data = newtest,aes(x=sim_x)) +
+  geom_point(mapping = aes(y=sim_y))+
+  geom_line(mapping = aes(y=yhatltest), color = "red")+
+  geom_line(mapping = aes(y=sim_x^3), color = "black")+
+  geom_line(mapping = aes(y=yhathtest), color = "blue")
+```
+
+Graph of Task3B Step 10: the MSE-bandwidth relations on training data, and test data
+```{r Task3B Step 10, echo=FALSE, eval=TRUE}
+ggplot(data = M)+
+  geom_line(mapping = aes(x=bw,y=MSEtrain,color='blue'))+
+  geom_line(mapping = aes(x=bw,y=MSEtest,color='yellow'))
+```
+
