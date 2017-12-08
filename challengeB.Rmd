@@ -10,8 +10,8 @@ output:
 chooseCRANmirror(graphics=FALSE, ind=1)
 knitr::opts_chunk$set(echo = TRUE)
 ```
-## Task1 B
 public repo:https://github.com/Aliceleung1996/ChallengeB_LiangYan_HuTianxing
+## Task1 B
 
 Step1:
 A  non-parametric statistical method makes no assumption on the population distribution or sample size. 
@@ -319,7 +319,7 @@ ggplot(data = newtest,aes(x=sim_x)) +
 Graph of Task3B Step 10: the MSE-bandwidth relations on training data, and test data
 ```{r Task3B Step 10, echo=FALSE, eval=TRUE}
 ggplot(data = M)+
-  geom_line(mapping = aes(x=bw,y=MSEtrain,color='blue'))+
-  geom_line(mapping = aes(x=bw,y=MSEtest,color='yellow'))
+  geom_line(mapping = aes(x=bw,y=MSEtrain,color="blue"))+
+  geom_line(mapping = aes(x=bw,y=MSEtest,color='"yellow"))
 ```
 
